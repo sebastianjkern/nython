@@ -1,0 +1,34 @@
+[
+    {
+        "code": "print('Hello, Node A')",
+        "uuid": "A",
+        "parents": [],
+        "children": [
+            "B"
+        ]
+    },
+    {
+        "code": "print('Hello, Node B'); a = 2",
+        "uuid": "B",
+        "parents": [
+            "A"
+        ],
+        "children": [
+            "C"
+        ]
+    },
+    {
+        "code": "print('Hello, Node C'); a = 4",
+        "uuid": "C",
+        "parents": [
+            "B"
+        ],
+        "children": []
+    },
+    {
+        "code": "print('Hello, Node D')",
+        "uuid": "D",
+        "parents": [],
+        "children": []
+    }
+]

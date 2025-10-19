@@ -1,0 +1,5 @@
+/.nython
+/.venv
+
+__pycache__/
+*.ttf
