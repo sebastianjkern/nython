@@ -1,53 +1,113 @@
 from ui.node import IMGuiNode
-from _runtime import flow, node
+
+from _runtime.node import NodeData, Connector, ConnectorType
+from _runtime.flow import Flow
+
+from typing import Union
 
 import dearpygui.dearpygui as dpg
 
 class NodeEditor:
     def __init__(self, parent: int|str) -> None:
-        self.nodes: list[IMGuiNode]
-        self.flow: flow.Flow
-        self.parent = parent
+        self._imgui_parent = parent
+        self._editor_tag = str(dpg.generate_uuid())
 
-        self.editor_tag = dpg.generate_uuid()
+        self._node_lut: dict[Union[str, int], IMGuiNode] | None = None
 
-    def _load(self):
-        self.flow = flow.Flow()
-        self.flow.load()
+        # Init Runtime Layer
+        self._flow = Flow()
 
-    def link_callback(self, sender, app_data):
+    def link(self, sender, app_data):
+        data = (dpg.get_item_alias(app_data[0]), dpg.get_item_alias(app_data[1]))
+
+        # TODO: Check whether only output-input pairs are connected
+        if len(set([self._flow._conn_lut[str(data[0])].type, self._flow._conn_lut[str(data[1])].type])) != 2:
+            return
+
         dpg.add_node_link(app_data[0], app_data[1], parent=sender)
-        print(f"Connection established {app_data[0], app_data[1]}")
+        self._flow.connect(str(data[0]), str(data[1]))
 
-    def delink_callback(self, sender, app_data):
+        print(f"Connection established {data[0], app_data[1]}")
+
+    def unlink(self, sender, app_data):
         dpg.delete_item(app_data)
+        self._flow.disconnect(str(app_data[0]), str(app_data[1]))
+
         print("Connection terminated")
 
-    def create_node(self, label: str = "Node"):
-        node_tag = dpg.generate_uuid()
-        with dpg.node(label=label, tag=node_tag, parent=self.editor_tag):
-            with dpg.node_attribute(label="Input"):
-                dpg.add_input_float(width=150)
-            with dpg.node_attribute(label="Output", attribute_type=dpg.mvNode_Attr_Output):
-                dpg.add_input_float(width=150)
+
+    def create_node(self, label: str):
+        input_tag = "input_" + str(dpg.generate_uuid())
+        output_tag = "output_" + str(dpg.generate_uuid())
+
+        node_tag = "node_" + str(dpg.generate_uuid())
+        data = NodeData(node_tag, "")
+
+        in_conn = Connector(input_tag, data)
+        in_conn.type = ConnectorType.INPUT
+
+        out_conn = Connector(output_tag, data)
+        out_conn.type = ConnectorType.OUTPUT
+
+        data.inputs = [in_conn]
+        data.outputs = [out_conn]
+
+        self._flow.add_node(data)
+
+        node = IMGuiNode(self._editor_tag, data, tag=node_tag)
+        node._outputs = [output_tag]
+        node._inputs = [input_tag]
+
+        node.show()
+
+        if self._node_lut is None:
+            self._node_lut = {}
+
+        self._node_lut[node_tag] = node
+
         return node_tag
 
-    def show(self):
-        self._load()
 
-        with dpg.node_editor(parent=self.parent, tag=self.editor_tag, callback=self.link_callback, delink_callback=self.delink_callback):
-            with dpg.node(label="Node 1"):
-                with dpg.node_attribute(label="Node A1"):
-                    dpg.add_input_float(label="F1", width=150)
+    def _load(self):
+        self._flow = self._flow.load()
+        self._node_lut = {}
 
-                with dpg.node_attribute(label="Node A2", attribute_type=dpg.mvNode_Attr_Output):
-                    dpg.add_input_text(label="Code", width=150, multiline=True)
+        for node_data in self._flow._nodes:
+            tag: str = node_data.uuid
+            node = IMGuiNode(self._editor_tag, node_data, tag)
 
-            with dpg.node(label="Node 2"):
-                with dpg.node_attribute(label="Node A3"):
-                    dpg.add_input_float(label="F3", width=200)
+            self._node_lut[tag] = node
 
-                with dpg.node_attribute(label="Node A4", attribute_type=dpg.mvNode_Attr_Output):
-                    dpg.add_input_float(label="F4", width=200)
+        connections: set[tuple[Union[str, int], Union[str, int]]] = set()
+
+        # After the whole nodes lut is created, we can establish connections
+        for node_data in self._flow._nodes:
+            tag: str = node_data.uuid
+
+            for child in node_data.outputs:
+                for connection in child.connections:
+                    connections.add((tag, connection))
+
+            for parent in node_data.inputs:
+                for connection in parent.connections:
+                    connections.add((tag, connection))
+
+        return connections
 
 
+    def startup(self):
+        connections = self._load()
+
+        with dpg.node_editor(parent=self._imgui_parent, tag=self._editor_tag, callback=self.link, delink_callback=self.unlink):
+            for item in self._node_lut.items():
+                tag, node = item
+
+                print(f"Showing item {tag}")
+
+                node.show()
+                
+            for item in connections:
+                i1, i2 = item
+
+                print(i1, i2)
+                dpg.add_node_link(i1, i2, parent=i1)

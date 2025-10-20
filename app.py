@@ -2,28 +2,35 @@ from ui.editor import NodeEditor
 
 from ui.theming import get_theme, load_font
 
+import sys
+
 import dearpygui.dearpygui as dpg
 
+# Redirect all print statements to a log file
+log_file = open("app.log", "a")
+# sys.stdout = log_file
+
+# Start DearPyGUI
 dpg.create_context()
 dpg.configure_app(docking=False, docking_space=False)
 dpg.create_viewport(title='Nython Editor', width=800, height=600, decorated=True)
 
+load_font()
+
 center_window = dpg.generate_uuid()
 settings_window = dpg.generate_uuid()
-node_editor = dpg.generate_uuid()
+node_editor = "editor_" + str(dpg.generate_uuid())
 
 create_node_popup = dpg.generate_uuid()
 create_node_input = dpg.generate_uuid()
 
-load_font()
-
 def print_me(sender):
     print(f"Menu Item: {sender}")
 
-flow = NodeEditor(center_window)
+editor = NodeEditor(center_window)
 # flow.load_flow()
 with dpg.window(label="Nython Editor", tag=center_window, no_collapse=True, no_close=True, no_title_bar=True, no_move=True):
-    flow.show()
+    editor.startup()
 
     with dpg.menu_bar():
         with dpg.menu(label="File"):
@@ -45,36 +52,19 @@ with dpg.window(label="Nython Editor", tag=center_window, no_collapse=True, no_c
             dpg.add_button(label="Press Me", callback=print_me)
             dpg.add_color_picker(label="Color Me", callback=print_me)
 
-        # Counter for naming new nodes
-        node_count = 0
-
-        def add_new_node(sender, app_data):
-            # Find the node editor within the current window
-            global node_count
-            node_label = f"Node {node_count + 1}"
-            with dpg.node(label=node_label, parent=node_editor):
-                # Example attributes for the new node
-                with dpg.node_attribute(label="Input"):
-                    dpg.add_input_float(width=150)
-                with dpg.node_attribute(label="Output", attribute_type=dpg.mvNode_Attr_Output):
-                    dpg.add_input_float(width=150)
-
-            node_count += 1
-
-
+# Create Node Pop Up
 with dpg.window(label="Create Node", modal=True, show=False, tag=create_node_popup, no_resize=True, no_collapse=True, no_move=True):
     dpg.add_text("Name des neuen Nodes:")
     dpg.add_input_text(tag=create_node_input, default_value="Node 1")
 
     def _create_node_cb(sender, app_data):
         name = dpg.get_value(create_node_input)
-        flow.create_node(name)
+        editor.create_node(name)
         dpg.configure_item(create_node_popup, show=False)
 
     with dpg.group(horizontal=True):
         dpg.add_button(label="Create", callback=_create_node_cb)
         dpg.add_button(label="Cancel", callback=lambda s,a: dpg.configure_item(create_node_popup, show=False))
-
 
 def key_handler(sender, app_data):
     # Provide a functionality for adding a new node
@@ -105,12 +95,18 @@ def key_handler(sender, app_data):
     if app_data == dpg.mvKey_Delete:
         print("Received node delete command")
         
-        nodes = dpg.get_selected_nodes(flow.editor_tag) or []
+        nodes = dpg.get_selected_nodes(editor._editor_tag) or []
 
-        # Delete all nodes
+        # Dann die selektierten Nodes löschen
         for node in nodes:
-            dpg.delete_item(node)
+            try:
+                dpg.delete_item(node)
+            except Exception:
+                pass
 
+    if app_data == dpg.mvKey_S and dpg.is_key_down(dpg.mvKey_LControl):
+        print("Saving")
+        editor._flow.save()
 
 with dpg.handler_registry() as fff:
     dpg.add_key_press_handler(callback=key_handler)

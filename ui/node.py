@@ -1,29 +1,33 @@
 from _runtime.node import NodeData
 
+from typing import Union
+
 import dearpygui.dearpygui as dpg
 
 class IMGuiNode:
-    def __init__(self, parent: str|int, node: NodeData) -> None:
-        self._parent = parent
+    def __init__(self, parent: str, node: NodeData, tag: str) -> None:
+        self._imgui_parent = parent
         self._data: NodeData = node
 
-        self.tag: str | int = node.uuid
+        self.tag: str = tag
 
         # Tags for UI Elements
-        self._title_tag = f"node_title_{self.tag}"
         self._popup_tag = f"rename_popup_{self.tag}"
         self._input_tag = f"rename_input_{self.tag}"
 
+        self._inputs = []
+        self._outputs = []
+
     def show(self):
         # Node selbst: zeige aktuellen Namen und einen Rename-Button
-        with dpg.node(parent=self._parent, tag=self.tag):
-            # Titel / Name des Node
-            dpg.add_text(getattr(self._data, "name", "Node"), tag=self._title_tag)
-            # Button öffnet das modale Rename-Fenster
-            dpg.add_button(label="Rename", callback=lambda s,a,u=None: dpg.configure_item(self._popup_tag, show=True))
+        with dpg.node(label="Node", parent=self._imgui_parent, tag=self.tag):
+            for input in self._inputs:
+                with dpg.node_attribute(label="Node A1", tag=input, attribute_type=dpg.mvNode_Attr_Input):
+                    dpg.add_input_float(label="Input", tag=f"float_{self.tag}", width=150)
 
-            with dpg.node_attribute(label="Node A2", attribute_type=dpg.mvNode_Attr_Output):
-                dpg.add_input_text(label="Code", width=150, multiline=True)
+            for output in self._outputs:
+                with dpg.node_attribute(label="Node A2", tag=output, attribute_type=dpg.mvNode_Attr_Output):
+                    dpg.add_input_text(label="Code", tag=f"text_{self.tag}", width=150, multiline=True)
 
         # Popup (modal) zum Umbenennen — nur einmal anlegen
         if not dpg.does_item_exist(self._popup_tag):
@@ -46,8 +50,8 @@ class IMGuiNode:
                 # falls kein Attribut vorhanden, still fail-safe
                 pass
             # sichtbaren Titel aktualisieren
-            if dpg.does_item_exist(self._title_tag):
-                dpg.set_value(self._title_tag, new_name)
+            if dpg.does_item_exist(self.tag):
+                dpg.set_value(self._input_tag, new_name)
         # Popup schließen
         if dpg.does_item_exist(self._popup_tag):
             dpg.configure_item(self._popup_tag, show=False)

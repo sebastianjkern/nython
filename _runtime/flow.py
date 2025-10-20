@@ -1,15 +1,40 @@
-from _runtime.node import NodeData
+from _runtime.node import NodeData, Connector
 from _util.diff import diff_dict
+
+from typing import Union
 
 import json
 
 class Flow:
     def __init__(self) -> None:
-        self.nodes: list[NodeData] = list()
+        self._nodes: list[NodeData] = list()
+
+        self._conn_lut: dict[str, Connector] = {}
+
+    def add_node(self, node: NodeData):
+        self._nodes.append(node)
+
+        for input in node.inputs:
+            self._conn_lut[input.uuid] = input
+
+        for output in node.outputs:
+            self._conn_lut[output.uuid] = output
+
+        print(self._conn_lut)
+
+    def remove_node(self, node: NodeData):
+        self._nodes.remove(node)
+
+        for input in node.inputs:
+            del self._conn_lut[input.uuid]
+
+        for output in node.outputs:
+            del self._conn_lut[output.uuid]
+
 
     def save(self):
         with open("./flow.json", "w") as file:
-            file.write( json.dumps(self.nodes, default=lambda o: o.to_dict(), indent=4))
+            file.write( json.dumps(self._nodes, default=lambda o: o.to_dict(), indent=4))
        
     @classmethod
     def load(cls):
@@ -19,16 +44,31 @@ class Flow:
         flow = Flow()
 
         for node in read_flow:
-            n = NodeData(node["uuid"], code=node["code"])
-            n.children = node["children"]
-            n.parents = node["parents"]
-            flow.nodes.append(n)
+            new_node = NodeData.from_dict(node)
+            flow.add_node(new_node)
+
+        for node in flow._nodes:
+            for connector in node.inputs:
+                flow._conn_lut[connector.uuid] = connector
+
+            for connector in node.outputs:
+                flow._conn_lut[connector.uuid] = connector
 
         return flow
     
+    def disconnect(self, conn1: str, conn2: str):
+        self._conn_lut[conn1].connections.remove(conn2)
+        self._conn_lut[conn2].connections.remove(conn1)
+
+    def connect(self, conn1: str, conn2: str):
+        self._conn_lut[conn1].connections.add(conn2)
+        self._conn_lut[conn2].connections.add(conn1)
+
     def run(self):
+        # TODO: Fix this stuff, does not work at the moment
+
         # Execute nodes in topological order.
-        remaining = set(self.nodes)
+        remaining = set(self._nodes)
         executed_outputs: dict[NodeData, tuple] = {}
 
         while remaining:
@@ -53,30 +93,4 @@ class Flow:
 
     def to_python(self) -> str:
         return NotImplemented
-                    
-if __name__ == "__main__":
-    # Create a simple linear dependency A -> B -> C and an independent node D
-    node_a = NodeData("A", code="print('Hello, Node A')")
-    node_b = NodeData("B", code="print('Hello, Node B'); a = 2")
-    node_c = NodeData("C", code="print('Hello, Node C'); a = 4")
-    node_d = NodeData("D", code="print('Hello, Node D')")
 
-    node_a.children.append(node_b)
-    node_b.parents.append(node_a)
-
-    node_b.children.append(node_c)
-    node_c.parents.append(node_b)
-
-    # Node D has no parents and will use builtins as globals
-    flow = Flow()
-    flow.nodes = [node_a, node_b, node_c, node_d]
-    flow.save()
-    
-    print("Running the flow...")
-    flow.run()
-    print("Flow execution completed.")
-
-    new_flow = flow.load()
-    print("Running the newly read flow...")
-    flow.run()
-    print("Read Flow execution completed.")
