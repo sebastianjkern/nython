@@ -2,7 +2,7 @@ from ui.editor import NodeEditor
 
 from ui.theming import get_theme, load_font
 
-import sys
+from _runtime.events import RuntimeEvents
 
 import dearpygui.dearpygui as dpg
 
@@ -54,13 +54,22 @@ with dpg.window(label="Nython Editor", tag=center_window, no_collapse=True, no_c
 
 # Create Node Pop Up
 with dpg.window(label="Create Node", modal=True, show=False, tag=create_node_popup, no_resize=True, no_collapse=True, no_move=True):
-    dpg.add_text("Name des neuen Nodes:")
     dpg.add_input_text(tag=create_node_input, default_value="Node 1")
 
     def _create_node_cb(sender, app_data):
         name = dpg.get_value(create_node_input)
-        editor.create_node(name)
-        dpg.configure_item(create_node_popup, show=False)
+        # Emit a create_node command; the runtime will emit node_added which the GUI listens to
+        try:
+            editor._flow.events.emit_sync(RuntimeEvents.CREATE_NODE, {"label": name})
+        except Exception:
+            # fallback to local create if event bus unavailable
+            try:
+                editor.create_node(name)
+            except Exception:
+                pass
+
+    # Close popup immediately; the GUI node will be created when the runtime emits the event
+    dpg.configure_item(create_node_popup, show=False)
 
     with dpg.group(horizontal=True):
         dpg.add_button(label="Create", callback=_create_node_cb)
@@ -82,6 +91,9 @@ def key_handler(sender, app_data):
             return
 
         # Berechne Position, damit das Modal im Zentrum des Hauptfensters sitzt
+        # help static type checkers: assert values are not None
+        assert main_w is not None and main_h is not None and modal_w is not None and modal_h is not None and main_pos is not None
+
         rel_x = int(main_w / 2 - modal_w / 2)
         rel_y = int(main_h / 2 - modal_h / 2)
         abs_x = int(main_pos[0] + rel_x)
@@ -100,13 +112,38 @@ def key_handler(sender, app_data):
         # Dann die selektierten Nodes löschen
         for node in nodes:
             try:
-                dpg.delete_item(node)
+                # Prefer removing via runtime Flow so the GUI is reconciled from events
+                lut = getattr(editor, "_node_lut", None)
+                if lut and str(node) in lut:
+                    node_obj = lut[str(node)]
+                    # NodeData is stored on the IMGuiNode instance as `_data`
+                    try:
+                        editor._flow.remove_node(node_obj._data)
+                    except Exception:
+                        # fallback to deleting GUI item directly if runtime removal fails
+                        try:
+                                # Emit a remove command; runtime will remove and GUI updates from event
+                                try:
+                                    editor._flow.events.emit_sync(RuntimeEvents.REM_NODE, {"uuid": str(node)})
+                                except Exception:
+                                    dpg.delete_item(node)
+                        except Exception:
+                            pass
+                else:
+                    # If we don't have a runtime mapping, remove the GUI item directly
+                    try:
+                        dpg.delete_item(node)
+                    except Exception:
+                        pass
             except Exception:
                 pass
 
     if app_data == dpg.mvKey_S and dpg.is_key_down(dpg.mvKey_LControl):
         print("Saving")
-        editor._flow.save()
+        try:
+            editor._flow.events.emit_sync(RuntimeEvents.SAVE, None)
+        except Exception:
+            editor._flow.save()
 
 with dpg.handler_registry() as fff:
     dpg.add_key_press_handler(callback=key_handler)
@@ -122,4 +159,11 @@ dpg.show_viewport()
 dpg.set_primary_window(center_window, True)
 
 dpg.start_dearpygui()
-dpg.destroy_context()
+try:
+    # stop EventBus worker(s) if any
+    try:
+        editor._flow.events.stop()
+    except Exception:
+        pass
+finally:
+    dpg.destroy_context()
