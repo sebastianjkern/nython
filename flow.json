@@ -1,40 +1,38 @@
 [
     {
         "code": "",
-        "uuid": "node_82",
-        "inputs": {
-            "input_80": []
-        },
-        "outputs": {
-            "output_81": [
-                "input_92"
-            ]
-        }
+        "uuid": 79,
+        "inputs": [
+            {
+                "uuid": 77,
+                "connections": []
+            }
+        ],
+        "outputs": [
+            {
+                "uuid": 78,
+                "connections": [
+                    82
+                ]
+            }
+        ]
     },
     {
         "code": "",
-        "uuid": "node_94",
-        "inputs": {
-            "input_92": [
-                "output_81"
-            ]
-        },
-        "outputs": {
-            "output_93": [
-                "input_99"
-            ]
-        }
-    },
-    {
-        "code": "",
-        "uuid": "node_101",
-        "inputs": {
-            "input_99": [
-                "output_93"
-            ]
-        },
-        "outputs": {
-            "output_100": []
-        }
+        "uuid": 84,
+        "inputs": [
+            {
+                "uuid": 82,
+                "connections": [
+                    78
+                ]
+            }
+        ],
+        "outputs": [
+            {
+                "uuid": 83,
+                "connections": []
+            }
+        ]
     }
 ]
