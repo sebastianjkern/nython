@@ -1,5 +1,5 @@
 from types import CodeType
-from core.runtime.connector import Connector, ConnectorType
+from nython.core.runtime.connector import Connector, ConnectorType
 
 class NodeData:
     def __init__(self, uuid: str|int, code:str) -> None:

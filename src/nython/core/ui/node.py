@@ -1,4 +1,4 @@
-from core.runtime.node import NodeData
+from nython.core.runtime.node import NodeData
 
 import dearpygui.dearpygui as dpg
 

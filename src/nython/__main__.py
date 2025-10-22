@@ -1,5 +1,5 @@
-from core.ui.editor import NodeEditor
-from core.ui.theming import get_theme, load_font
+from nython.core.ui.editor import NodeEditor
+from nython.core.ui.theming import get_theme, load_font
 
 import dearpygui.dearpygui as dpg
 

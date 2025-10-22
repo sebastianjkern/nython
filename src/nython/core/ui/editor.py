@@ -1,8 +1,8 @@
-from core.runtime.node import NodeData
-from core.runtime.flow import Flow
-from core.runtime.connector import Connector, ConnectorType
+from nython.core.runtime.node import NodeData
+from nython.core.runtime.flow import Flow
+from nython.core.runtime.connector import Connector, ConnectorType
 
-from core.ui.node import IMGuiNode
+from nython.core.ui.node import IMGuiNode
 
 from util.uuid import get_uuid
 

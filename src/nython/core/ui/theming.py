@@ -1,7 +1,5 @@
 import dearpygui.dearpygui as dpg
 
-from pathlib import Path
-
 def load_font():
     # add a font registry
     with dpg.font_registry():

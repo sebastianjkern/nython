@@ -1,6 +1,6 @@
-from core.runtime.node import NodeData
-from core.runtime.connector import Connector
-from core.runtime.connector import ConnectorType
+from nython.core.runtime.node import NodeData
+from nython.core.runtime.connector import Connector
+from nython.core.runtime.connector import ConnectorType
 
 from typing import Union
 
