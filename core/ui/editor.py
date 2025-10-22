@@ -4,6 +4,8 @@ from core.runtime.connector import Connector, ConnectorType
 
 from core.ui.node import IMGuiNode
 
+from _util.uuid import get_uuid
+
 import dearpygui.dearpygui as dpg
 
 class NodeEditor:
@@ -28,15 +30,16 @@ class NodeEditor:
 
         # Create Node Pop Up
         with dpg.window(label="Create Node", modal=True, show=False, tag=self._create_node_popup, no_resize=True, no_collapse=True, no_move=True):
-            dpg.add_input_text(tag=self._create_node_input, default_value="Node 1")
+            dpg.add_input_text(tag=self._create_node_input, default_value="New Node")
 
             def _create_node_cb(sender, app_data):
                 name = dpg.get_value(self._create_node_input)
 
-                input_tag = dpg.generate_uuid()
-                output_tag = dpg.generate_uuid()
+                input_tag = get_uuid()
+                output_tag = get_uuid()
 
-                node_tag = dpg.generate_uuid()
+                node_tag = get_uuid()
+
                 data = NodeData(node_tag, "")
                 data.title = name
 
@@ -49,10 +52,10 @@ class NodeEditor:
                 data.inputs = [in_conn]
                 data.outputs = [out_conn]
 
-                self.flow.add_node(data)
-
-                node = IMGuiNode(self._editor_tag, data, node_tag)
+                node = IMGuiNode(self._editor_tag, data)
                 node.show()
+
+                self.flow.add_node(data)
 
                 # Close the Popup in case the node was created sucessfully
                 dpg.configure_item(self._create_node_popup, show=False)
@@ -68,7 +71,43 @@ class NodeEditor:
             dpg.add_key_press_handler(callback=self.key_handler)
 
         return self
+
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        for node in self.flow._nodes:
+            ui_node = IMGuiNode(self._editor_tag, node)
+
+            try:
+                ui_node.show()
+            except Exception as err:
+                print("error while loading node:", err)
+
+        # Restore connections from flow._connections (set[frozenset])
+        for pair in self.flow._connections:
+            # pair ist ein frozenset mit genau zwei connector-uuids
+            a, b = tuple(pair)
+
+            ca = self.flow._find_connector(a)
+            cb = self.flow._find_connector(b)
+
+            # beide Connector-Objekte müssen vorhanden sein
+            if ca is None or cb is None:
+                continue
+
+            # bestimme Richtung: add_node_link(output_attr, input_attr, ...)
+            if ca.type == ConnectorType.INPUT and cb.type == ConnectorType.OUTPUT:
+                out_attr = cb.uuid
+                in_attr = ca.uuid
+            elif cb.type == ConnectorType.INPUT and ca.type == ConnectorType.OUTPUT:
+                out_attr = ca.uuid
+                in_attr = cb.uuid
+            else:
+                # ungültige Paarung (z.B. input-input oder output-output) überspringen
+                continue
+
+            dpg.add_node_link(out_attr, in_attr, parent=self._editor_tag)
     
+
     def key_handler(self, sender, app_data):
         # Provide a functionality for adding a new node
         if app_data == dpg.mvKey_N and dpg.is_key_down(dpg.mvKey_LShift):
@@ -114,46 +153,12 @@ class NodeEditor:
             print("Saved")
             self.flow.save()
 
-    def __exit__(self, exc_type, exc_value, exc_traceback):
-        for node in self.flow._nodes:
-            print(type(node.uuid))
-
-            ui_node = IMGuiNode(self._editor_tag, node, node.uuid)
-
-            try:
-                ui_node.show()
-            except Exception as err:
-                print("error while loading node:", err)
-
-        # Restore connections from flow._connections (set[frozenset])
-        for pair in self.flow._connections:
-            # pair ist ein frozenset mit genau zwei connector-uuids
-            a, b = tuple(pair)
-
-            ca = self.flow._find_connector(a)
-            cb = self.flow._find_connector(b)
-
-            # beide Connector-Objekte müssen vorhanden sein
-            if ca is None or cb is None:
-                continue
-
-            # bestimme Richtung: add_node_link(output_attr, input_attr, ...)
-            if ca.type == ConnectorType.INPUT and cb.type == ConnectorType.OUTPUT:
-                out_attr = cb.uuid
-                in_attr = ca.uuid
-            elif cb.type == ConnectorType.INPUT and ca.type == ConnectorType.OUTPUT:
-                out_attr = ca.uuid
-                in_attr = cb.uuid
-            else:
-                # ungültige Paarung (z.B. input-input oder output-output) überspringen
-                continue
-
-            dpg.add_node_link(out_attr, in_attr, parent=self._editor_tag)
 
     def link(self, sender, app_data):
         # Connect nodes
         self.flow.connect(app_data[0], app_data[1])
         dpg.add_node_link(app_data[0], app_data[1], parent=sender)
+
 
     def unlink(self, sender, app_data):
         # get link info
