@@ -1,10 +1,9 @@
 from nython.core.runtime.node import NodeData
 from nython.core.runtime.flow import Flow
 from nython.core.runtime.connector import Connector, ConnectorType
-
 from nython.core.ui.node import IMGuiNode
 
-from util.uuid import get_uuid
+from nython.util.uuid import get_uuid
 
 import dearpygui.dearpygui as dpg
 
