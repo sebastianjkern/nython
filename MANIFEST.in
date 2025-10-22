@@ -1,1 +1,1 @@
-include src/nython/res/OpenSans-Regular.ttf
+include src/nython/res/*.ttf
