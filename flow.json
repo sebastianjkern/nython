@@ -1,6 +1,7 @@
 [
     {
-        "code": "",
+        "name": "Node 1",
+        "code": "print(\"Hello World\")\na = 1",
         "uuid": 79,
         "inputs": [
             {
@@ -18,7 +19,8 @@
         ]
     },
     {
-        "code": "",
+        "name": "Node 2",
+        "code": "print(a)",
         "uuid": 84,
         "inputs": [
             {

@@ -1,5 +1,6 @@
 from core.runtime.node import NodeData
 from core.runtime.connector import Connector
+from core.runtime.connector import ConnectorType
 
 from typing import Union
 
@@ -77,27 +78,45 @@ class Flow:
         return None
 
     def run(self):
-        # TODO: Fix this stuff, does not work at the moment
-
-        # Execute nodes in topological order.
+        # Knoten und ihre Ausführungsergebnisse
         remaining = set(self._nodes)
-        executed_outputs: dict[NodeData, tuple] = {}
+        executed: dict[NodeData, tuple[dict, dict]] = {}
 
+        # Für jeden Knoten Vorgänger aus Verbindungen ermitteln
+        predecessors: dict[NodeData, set[NodeData]] = {}
+        for node in self._nodes:
+            # Finde alle verbundenen Input-Connectors
+            pred_set = set()
+            for input in node.inputs:
+                for conn_id in input.connections:
+                    # Finde Quell-Connector und dessen Node
+                    source = self._find_connector(conn_id)
+                    if source and source.type == ConnectorType.OUTPUT:
+                        # Füge den Quell-Node zu Vorgängern hinzu
+                        source_node = next((n for n in self._nodes if source in n.outputs), None)
+                        if source_node:
+                            pred_set.add(source_node)
+            predecessors[node] = pred_set
+
+        # Execute in topological order
         while remaining:
             for node in list(remaining):
-                parents = getattr(node, "parents", [])
-                if all(p in executed_outputs for p in parents):
-                    if not parents:
-                        globals_dict = {}
-                        locals_dict = {}
+                # Check if all predecessors where executed
+                preds = predecessors[node]
+                if all(p in executed for p in preds):
+                    # Take the globals and local from the predecessors
+                    if not preds:
+                        globals_dict, locals_dict = {}, {}
                     else:
-                        globals_dict, locals_dict = executed_outputs[parents[0]]
+                        # Use the predecessors vars
+                        globals_dict, locals_dict = next(iter(executed[p] for p in preds))
 
-                    # <– execute the node in both cases
+                    # Execute nodes and store results
                     new_globals, new_locals = node.execute(globals_dict, locals_dict)
-                    executed_outputs[node] = (new_globals, new_locals)
-
+                    executed[node] = (new_globals, new_locals)
                     remaining.remove(node)
+
+        return executed
 
     @classmethod
     def load(cls, filename = "./flow.json") -> "Flow":

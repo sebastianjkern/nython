@@ -13,13 +13,18 @@ class NodeData:
         self.code_hash: int = hash(self.code)
         self._compiled_code: CodeType
 
-    def execute(self, _locals:dict, _globals:dict) -> tuple[dict, dict]:
+    def _compile(self):
+        self._compiled_code = compile(self.code, "<string>", "exec")
+
+    def set_code(self, code: str):
+        self.code = code
+
+        self._compile()
+
+    def execute(self, _locals: dict, _globals: dict) -> tuple[dict, dict]:
         print(f"Executing node {self.uuid}")
 
-        # On Demand compilation of the node code
-        if self.code_hash != hash(self.code):
-            self._compiled_code = compile(self.code, "<string>", "exec")
-            self.code_hash = hash(self.code)
+        self._compile()
 
         # create isolated copies so caller's dicts remain unchanged
         g = _globals.copy()
@@ -30,6 +35,7 @@ class NodeData:
 
     def to_dict(self):
         return {
+            "name": self.title,
             "code": self.code,
             "uuid": self.uuid,
             "inputs": [in_conns.to_dict() for in_conns in self.inputs], 
@@ -42,6 +48,7 @@ class NodeData:
         Erzeuge ein NodeData-Objekt aus dem von to_dict erzeugten dict.
         Erwartetes Format (nur neues Format):
         {
+            "name": str,
             "code": str,
             "uuid": str|int,
             "inputs": { connector_uuid: connector_dict, ... },
@@ -50,7 +57,10 @@ class NodeData:
         """
         uuid: int = data.get("uuid", 0)
         code: str = data.get("code", "")
+        title: str = data.get("name", "Imported Node")
+
         node = NodeData(uuid, code)
+        node.title = title
 
         inputs = data.get("inputs", []) or []
         outputs = data.get("outputs", []) or []

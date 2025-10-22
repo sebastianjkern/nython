@@ -11,29 +11,29 @@ import dearpygui.dearpygui as dpg
 class NodeEditor:
     def __init__(self) -> None:
         # Imgui Stuff
-        self._editor_tag = "_editor"
+        self.editor_tag = "_editor"
 
         # Load Runtime Layer
         self.flow: Flow = Flow.load()
 
-        self._center_window = "main_window"
-        self._settings_window = "settings_window"
+        self.window_tag = "_window"
+        self.settings_tag = "_settings"
 
-        self._create_node_popup = "create_node_popup"
-        self._create_node_input = "create_node_input"
+        self.create_node_popup_tag = "create_node_popup"
+        self.create_node_input_tag = "create_node_input"
 
     def __enter__(self):
         # Main editor window
-        with dpg.window(label="Nython Editor", tag=self._center_window, no_collapse=True, no_close=True, no_title_bar=True, no_move=True):
-            with dpg.node_editor(parent=self._center_window, tag=self._editor_tag, callback=self.link, delink_callback=self.unlink):
+        with dpg.window(label="Nython Editor", tag=self.window_tag, no_collapse=True, no_close=True, no_title_bar=True, no_move=True):
+            with dpg.node_editor(parent=self.window_tag, tag=self.editor_tag, callback=self.link, delink_callback=self.unlink):
                 pass
 
         # Create Node Pop Up
-        with dpg.window(label="Create Node", modal=True, show=False, tag=self._create_node_popup, no_resize=True, no_collapse=True, no_move=True):
-            dpg.add_input_text(tag=self._create_node_input, default_value="New Node")
+        with dpg.window(label="Create Node", modal=True, show=False, tag=self.create_node_popup_tag, no_resize=True, no_collapse=True, no_move=True):
+            dpg.add_input_text(tag=self.create_node_input_tag, default_value="New Node")
 
             def _create_node_cb(sender, app_data):
-                name = dpg.get_value(self._create_node_input)
+                name = dpg.get_value(self.create_node_input_tag)
 
                 input_tag = get_uuid()
                 output_tag = get_uuid()
@@ -52,20 +52,20 @@ class NodeEditor:
                 data.inputs = [in_conn]
                 data.outputs = [out_conn]
 
-                node = IMGuiNode(self._editor_tag, data)
+                node = IMGuiNode(self.editor_tag, data)
                 node.show()
 
                 self.flow.add_node(data)
 
                 # Close the Popup in case the node was created sucessfully
-                dpg.configure_item(self._create_node_popup, show=False)
+                dpg.configure_item(self.create_node_popup_tag, show=False)
 
             # Close popup immediately; the GUI node will be created when the runtime emits the event
-            dpg.configure_item(self._create_node_popup, show=False)
+            dpg.configure_item(self.create_node_popup_tag, show=False)
 
             with dpg.group(horizontal=True):
                 dpg.add_button(label="Create", callback=_create_node_cb)
-                dpg.add_button(label="Cancel", callback=lambda s,a: dpg.configure_item(self._create_node_popup, show=False))
+                dpg.add_button(label="Cancel", callback=lambda s,a: dpg.configure_item(self.create_node_popup_tag, show=False))
 
         with dpg.handler_registry() as fff:
             dpg.add_key_press_handler(callback=self.key_handler)
@@ -75,7 +75,7 @@ class NodeEditor:
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
         for node in self.flow._nodes:
-            ui_node = IMGuiNode(self._editor_tag, node)
+            ui_node = IMGuiNode(self.editor_tag, node)
 
             try:
                 ui_node.show()
@@ -105,19 +105,19 @@ class NodeEditor:
                 # ungültige Paarung (z.B. input-input oder output-output) überspringen
                 continue
 
-            dpg.add_node_link(out_attr, in_attr, parent=self._editor_tag)
+            dpg.add_node_link(out_attr, in_attr, parent=self.editor_tag)
     
 
     def key_handler(self, sender, app_data):
         # Provide a functionality for adding a new node
         if app_data == dpg.mvKey_N and dpg.is_key_down(dpg.mvKey_LShift):
             # Item-Größen und -Positionen im Bezug auf die Viewport/Applikation abfragen
-            dpg.configure_item(self._create_node_popup, show=True)
+            dpg.configure_item(self.create_node_popup_tag, show=True)
 
             main_w = dpg.get_viewport_width()
             main_h = dpg.get_viewport_height()
-            modal_w = dpg.get_item_width(self._create_node_popup)
-            modal_h = dpg.get_item_height(self._create_node_popup)
+            modal_w = dpg.get_item_width(self.create_node_popup_tag)
+            modal_h = dpg.get_item_height(self.create_node_popup_tag)
             main_pos = dpg.get_viewport_pos()  # absolute Position des Viewports
 
             if any(v is None for v in (main_w, main_h, modal_w, modal_h, main_pos)):
@@ -132,14 +132,14 @@ class NodeEditor:
             abs_x = int(main_pos[0] + rel_x)
             abs_y = int(main_pos[1] + rel_y)
             # setze die absolute Position im Koordinatensystem des Viewports
-            dpg.set_item_pos(self._create_node_popup, [rel_x, rel_y])
+            dpg.set_item_pos(self.create_node_popup_tag, [rel_x, rel_y])
             
-            dpg.focus_item(self._create_node_input)
+            dpg.focus_item(self.create_node_input_tag)
 
         # Delete selected nodes
         if app_data == dpg.mvKey_Delete:
-            nodes = dpg.get_selected_nodes(self._editor_tag) or []
-            links = dpg.get_selected_links(self._editor_tag) or []
+            nodes = dpg.get_selected_nodes(self.editor_tag) or []
+            links = dpg.get_selected_links(self.editor_tag) or []
 
             # Dann die selektierten Nodes löschen
             for node in nodes:
@@ -153,6 +153,8 @@ class NodeEditor:
             print("Saved")
             self.flow.save()
 
+        if app_data == dpg.mvKey_F5:
+            self.flow.run()
 
     def link(self, sender, app_data):
         # Connect nodes
