@@ -1,1 +1,1 @@
-include src/nython/res/*.ttf
+graft src
