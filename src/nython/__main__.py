@@ -1,9 +1,9 @@
 from nython.core.ui.editor import NodeEditor
 from nython.core.ui.theming import get_theme, load_font
 
-import dearpygui.dearpygui as dpg
+from pathlib import Path
 
-print(__file__)
+import dearpygui.dearpygui as dpg
 
 # Redirect all print statements to a log file
 log_file = open("app.log", "a")
@@ -13,7 +13,10 @@ dpg.create_context()
 dpg.configure_app(docking=False, docking_space=False)
 dpg.create_viewport(title='Nython Editor', width=1280, height=720, decorated=True)
 
-load_font()
+path = Path(__file__).parent / "/res/OpenSans-Regular.ttf"
+print("Import font from", path)
+
+load_font(path)
 
 with NodeEditor() as editor:
     theme = get_theme()

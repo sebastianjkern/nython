@@ -1,14 +1,8 @@
 import dearpygui.dearpygui as dpg
 
-from pathlib import Path
-
-def load_font():
+def load_font(path):
     # add a font registry
     with dpg.font_registry():
-        path = Path(__file__).parent / "/res/OpenSans-Regular.ttf"
-
-        print("Import font from", path)
-
         # first argument ids the path to the .ttf or .otf file
         default_font = dpg.add_font(path.absolute().as_uri(), 18)
         dpg.bind_font(default_font)
@@ -78,34 +72,3 @@ def get_theme(accent=(99, 179, 237, 255)):
             dpg.add_theme_color(dpg.mvThemeCol_SliderGrab, accent, category=dpg.mvThemeCat_Core)
 
     return theme_id
-
-
-if __name__ == "__main__":
-    import dearpygui.dearpygui as dpg
-
-    dpg.create_context()
-
-    load_font()
-
-    with dpg.window(label="Tutorial", pos=(20, 50), width=275, height=225) as win1:
-        t1 = dpg.add_input_text(default_value="some text")
-        t2 = dpg.add_input_text(default_value="some text")
-        with dpg.child_window(height=100):
-            t3 = dpg.add_input_text(default_value="some text")
-            dpg.add_input_int()
-        dpg.add_input_text(default_value="some text")
-
-    with dpg.window(label="Tutorial", pos=(320, 50), width=275, height=225) as win2:
-        dpg.add_input_text(default_value="some text")
-        dpg.add_input_int()
-
-    global_theme = get_theme()
-    dpg.bind_theme(global_theme)
-
-    dpg.show_style_editor()
-
-    dpg.create_viewport(title='Custom Title', width=800, height=600)
-    dpg.setup_dearpygui()
-    dpg.show_viewport()
-    dpg.start_dearpygui()
-    dpg.destroy_context()
