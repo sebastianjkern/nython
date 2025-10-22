@@ -1,10 +1,14 @@
 import dearpygui.dearpygui as dpg
 
+from pathlib import Path
+
 def load_font():
     # add a font registry
     with dpg.font_registry():
+        path = Path(__file__).parent / "/res/OpenSans-Regular.ttf"
+
         # first argument ids the path to the .ttf or .otf file
-        default_font = dpg.add_font("./res/OpenSans-Regular.ttf", 18)
+        default_font = dpg.add_font(path.absolute().as_uri(), 18)
         dpg.bind_font(default_font)
 
 def get_theme(accent=(99, 179, 237, 255)):
