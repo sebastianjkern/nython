@@ -3,6 +3,8 @@ from nython.core.ui.theming import get_theme, load_font
 
 import dearpygui.dearpygui as dpg
 
+print(__file__)
+
 # Redirect all print statements to a log file
 log_file = open("app.log", "a")
 # sys.stdout = log_file
