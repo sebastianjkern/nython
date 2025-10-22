@@ -21,3 +21,6 @@ Issues = "https://github.com/sebastianjkern/nython/issues"
 [build-system]
 requires = ["setuptools >= 77.0.3", "dearpygui"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.package-data]
+myModule = ["*.ttf"]
