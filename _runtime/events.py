@@ -11,6 +11,7 @@ class RuntimeEvents(Events):
     # Request Change
     CREATE_NODE = "cmd:create_node"
     REM_NODE = "cmd:remove_node"
+
     CONNECT = "cmd:connect"
     DISCONNECT = "cmd:disconnect"
 
@@ -23,6 +24,8 @@ class RuntimeEvents(Events):
 
     # IO
     SAVE = "cmd:save"
+
+    LOAD_FILE = "cmd:load"
     LOADED = "loaded"
 
     # EXECUTION

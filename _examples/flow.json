@@ -1,3 +1,26 @@
 [
-
+    {
+        "code": "",
+        "uuid": "node_82",
+        "inputs": {
+            "input_80": []
+        },
+        "outputs": {
+            "output_81": [
+                "input_92"
+            ]
+        }
+    },
+    {
+        "code": "",
+        "uuid": "node_94",
+        "inputs": {
+            "input_92": [
+                "output_81"
+            ]
+        },
+        "outputs": {
+            "output_93": []
+        }
+    }
 ]

@@ -1,8 +1,6 @@
 from _runtime.node import NodeData, Connector
 from _util.diff import diff_dict
-from _runtime.events import EventBus, Events, RuntimeEvents
-
-from typing import Union
+from _runtime.events import EventBus, RuntimeEvents
 
 import json
 
@@ -15,17 +13,17 @@ class Flow:
 
         # Event bus for notifying observers (GUI) about state changes.
         self.events = EventBus()
+
         # Simple revision counter to help synchronize GUI and runtime
         self._revision: int = 0
+        
         # Subscribe to command events so external layers can request changes
-        try:
-            self.events.subscribe(RuntimeEvents.CREATE_NODE, self._cmd_create_node)
-            self.events.subscribe(RuntimeEvents.REM_NODE, self._cmd_remove_node)
-            self.events.subscribe(RuntimeEvents.CONNECT, self._cmd_connect)
-            self.events.subscribe(RuntimeEvents.DISCONNECT, self._cmd_disconnect)
-            self.events.subscribe(RuntimeEvents.SAVE, self._cmd_save)
-        except Exception:
-            pass
+        self.events.subscribe(RuntimeEvents.CREATE_NODE, self._cmd_create_node)
+        self.events.subscribe(RuntimeEvents.REM_NODE, self._cmd_remove_node)
+        self.events.subscribe(RuntimeEvents.CONNECT, self._cmd_connect)
+        self.events.subscribe(RuntimeEvents.DISCONNECT, self._cmd_disconnect)
+        self.events.subscribe(RuntimeEvents.SAVE, self._cmd_save)
+        self.events.subscribe(RuntimeEvents.LOAD_FILE, self._cmd_load)
 
     def _bump_revision(self) -> int:
         self._revision += 1
@@ -43,11 +41,7 @@ class Flow:
 
         if emit:
             rev = self._bump_revision()
-            # emit lightweight payloads (no runtime objects)
-            try:
-                self.events.emit_sync(RuntimeEvents.NODE_CREATED, {"node": node.to_dict(), "revision": rev})
-            except Exception:
-                pass
+            self.events.emit_sync(RuntimeEvents.NODE_CREATED, {"node": node.to_dict(), "revision": rev})
 
     def remove_node(self, node: NodeData):
         self._nodes.remove(node)
@@ -61,18 +55,11 @@ class Flow:
         rev = self._bump_revision()
         self.events.emit_sync(RuntimeEvents.NODE_REMOVED, {"uuid": getattr(node, "uuid", None), "revision": rev})
 
-
-    def save(self):
-        with open("./flow.json", "w") as file:
-            file.write(json.dumps(self._nodes, default=lambda o: o.to_dict(), indent=4))
-
     # Command handlers
     def _cmd_create_node(self, payload: dict | None):
-        print("Flow received create node event...")
-
         if not payload:
             return
-        # payload expected: {"label": str, "node": serialized node optional}
+
         label = payload.get("label")
         node_dict = payload.get("node")
         if node_dict:
@@ -87,8 +74,6 @@ class Flow:
         self.add_node(node)
 
     def _cmd_remove_node(self, payload: dict | None):
-        print("Flow received delete node event...")
-
         if not payload:
             return
         # payload expected: {"uuid": str}
@@ -101,67 +86,59 @@ class Flow:
             self.remove_node(node)
 
     def _cmd_connect(self, payload: dict | None):
-        print("Flow received connect node event...")
-
         if not payload:
             return
         a = payload.get("a")
         b = payload.get("b")
         if not a or not b:
             return
-        try:
-            self.connect(str(a), str(b))
-        except Exception:
-            pass
+
+        self.connect(str(a), str(b))
 
     def _cmd_disconnect(self, payload: dict | None):
-        print("Flow received connect node event...")
-
         if not payload:
             return
         a = payload.get("a")
         b = payload.get("b")
         if not a or not b:
             return
-        try:
-            self.disconnect(str(a), str(b))
-        except Exception:
-            pass
+
+        self.disconnect(str(a), str(b))
 
     def _cmd_save(self, payload: dict | None):
-        print("Flow received connect node event...")
-
         try:
-            self.save()
+            with open("./flow.json", "w") as file:
+                file.write(json.dumps(self._nodes, default=lambda o: o.to_dict(), indent=4))
         except Exception:
             pass
 
-    @classmethod
-    def load(cls, emit_loaded: bool = True):
-        with open("./_examples/flow.json", "r") as file:
+    def _cmd_load(self, payload: dict):
+        emit_loaded = payload.get("emit_loaded", True)
+        filename = payload.get("filename", "./_examples/flow.json")
+
+        with open(filename, "r") as file:
             read_flow = json.loads(file.read())
 
-        flow = Flow()
+        self._nodes: list[NodeData] = list()
+        self._conn_lut: dict[str, Connector] = {}
 
         # when loading, we don't want to emit node_added events for each node
         for node in read_flow:
             new_node = NodeData.from_dict(node)
-            flow.add_node(new_node, emit=False)
+            self.add_node(new_node, emit=False)
 
         # rebuild conn lut explicitly (safety)
-        for node in flow._nodes:
+        for node in self._nodes:
             for connector in node.inputs:
-                flow._conn_lut[connector.uuid] = connector
+                self._conn_lut[connector.uuid] = connector
 
             for connector in node.outputs:
-                flow._conn_lut[connector.uuid] = connector
+                self._conn_lut[connector.uuid] = connector
 
         # After load, optionally emit a single 'loaded' event containing the full serialized state and a revision
-        flow._bump_revision()
+        self._bump_revision()
         if emit_loaded:
-            flow.events.emit_sync(RuntimeEvents.LOADED, {"nodes": [n.to_dict() for n in flow._nodes], "revision": flow._revision})
-
-        return flow
+            self.events.emit_sync(RuntimeEvents.LOADED, {"nodes": [n.to_dict() for n in self._nodes], "revision": self._revision})
 
     def disconnect(self, conn1: str, conn2: str):
         self._conn_lut[conn1].connections.remove(conn2)
@@ -192,16 +169,8 @@ class Flow:
                     else:
                         globals_dict, locals_dict = executed_outputs[parents[0]]
 
-
                     # <– execute the node in both cases
                     new_globals, new_locals = node.execute(globals_dict, locals_dict)
                     executed_outputs[node] = (new_globals, new_locals)
 
-                    print(diff_dict(globals_dict, new_globals))
-                    print(diff_dict(locals_dict, new_locals))
-
                     remaining.remove(node)
-
-    def to_python(self) -> str:
-        return NotImplemented
-

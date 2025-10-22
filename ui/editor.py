@@ -61,6 +61,7 @@ class NodeEditor:
         except Exception:
             pass
 
+
     def unlink(self, sender, app_data):
         # app_data contains the two ends
         a = dpg.get_item_alias(app_data[0])
@@ -70,50 +71,6 @@ class NodeEditor:
             self._flow.events.emit_sync(RuntimeEvents.DISCONNECT, {"a": str(a), "b": str(b)})
         except Exception:
             pass
-
-        # GUI link will be removed when runtime emits connection_removed
-
-
-    def create_node(self, label: str):
-        input_tag = "input_" + str(dpg.generate_uuid())
-        output_tag = "output_" + str(dpg.generate_uuid())
-
-        node_tag = "node_" + str(dpg.generate_uuid())
-        data = NodeData(node_tag, "")
-
-        in_conn = Connector(input_tag, data)
-        in_conn.type = ConnectorType.INPUT
-
-        out_conn = Connector(output_tag, data)
-        out_conn.type = ConnectorType.OUTPUT
-
-        data.inputs = [in_conn]
-        data.outputs = [out_conn]
-
-        # Request runtime to create the node via command event; GUI will be created from the runtime event
-        try:
-            # send serialized node so runtime can recreate it exactly
-            self._flow.events.emit_sync(RuntimeEvents.CREATE_NODE, {"node": data.to_dict(), "label": label})
-        except Exception:
-            pass
-        return node_tag
-
-
-    def _load(self):
-        # Load runtime state; runtime will emit a single 'loaded' event which we handle
-        # load without emitting 'loaded' so we can subscribe GUI handlers first
-        old_flow = getattr(self, "_flow", None)
-        self._flow = self._flow.load(emit_loaded=False)
-        # re-subscribe handlers to the new Flow.events instance
-        try:
-            self._subscribe_runtime_events()
-        except Exception:
-            pass
-        # _on_loaded handler will populate _node_lut and return connections if needed
-        # Do not emit 'loaded' here — caller (startup) will emit it inside a valid
-        # DearPyGui node_editor context so handlers can create GUI items safely.
-        return set()
-
 
     # Event handlers from runtime
     def _on_loaded(self, payload):
@@ -129,24 +86,21 @@ class NodeEditor:
         for node_dict in payload.get("nodes", []):
             tag = node_dict.get("uuid")
             node = IMGuiNode(self._editor_tag, NodeData.from_dict(node_dict), tag)
-            node._inputs = [c.get("uuid") for c in node_dict.get("inputs", [])]
-            node._outputs = [c.get("uuid") for c in node_dict.get("outputs", [])]
             self._node_lut[tag] = node
+
             node.show()
 
         # establish connections visually and record link ids
         for node_dict in payload.get("nodes", []):
-            for out in node_dict.get("outputs", []):
-                for conn in out.get("connections", []):
+            outputs = node_dict.get("outputs") or {}
+            # outputs is a dict: { connector_uuid: [connected_uuid, ...], ... }
+            for out_uuid, conn_list in outputs.items():
+                for conn in conn_list or []:
                     try:
-                        link_id = dpg.add_node_link(out.get("uuid"), conn, parent=self._editor_tag)
-                        key = frozenset([out.get("uuid"), conn])
-                        try:
-                            # some DPG builds return None for ids; handle gracefully
-                            if link_id is not None:
-                                self._link_lut[key] = link_id
-                        except Exception:
-                            pass
+                        link_id = dpg.add_node_link(out_uuid, conn, parent=self._editor_tag)
+                        key = frozenset([out_uuid, conn])
+                        if link_id is not None:
+                            self._link_lut[key] = link_id
                     except Exception:
                         pass
 
@@ -154,24 +108,26 @@ class NodeEditor:
         try:
             rev = payload.get("revision", 0)
             if rev <= self._revision:
+                print("old revision")
                 return
             self._revision = rev
         except Exception:
+            print("exception")
             pass
 
         node_dict = payload.get("node")
+        
         if not node_dict:
+            print("payload error")
             return
         
-        print(node_dict)
-
         tag = node_dict.get("uuid")
         node = IMGuiNode(self._editor_tag, NodeData.from_dict(node_dict), tag)
-        node._inputs = [c.get("uuid") for c in node_dict.get("inputs", [])]
-        node._outputs = [c.get("uuid") for c in node_dict.get("outputs", [])]
+
         if self._node_lut is None:
             self._node_lut = {}
         self._node_lut[tag] = node
+
         node.show()
 
     def _on_connection_added(self, payload):
@@ -215,28 +171,9 @@ class NodeEditor:
 
 
     def startup(self):
-        connections = self._load()
+        self._subscribe_runtime_events()
 
         with dpg.node_editor(parent=self._imgui_parent, tag=self._editor_tag, callback=self.link, delink_callback=self.unlink):
             # Emit the 'loaded' event now that the node_editor container exists so
             # handlers can create nodes/links with a valid parent.
-            try:
-                self._flow.events.emit_sync(RuntimeEvents.LOADED, {"nodes": [n.to_dict() for n in self._flow._nodes], "revision": self._flow._revision})
-            except Exception:
-                pass
-            if not self._node_lut:
-                # nothing loaded yet
-                self._node_lut = {}
-
-            for tag, node in list(self._node_lut.items()):
-                print(f"Showing item {tag}")
-                node.show()
-                
-            for item in connections:
-                i1, i2 = item
-
-                print(i1, i2)
-                try:
-                    dpg.add_node_link(i1, i2, parent=self._editor_tag)
-                except Exception:
-                    pass
+            self._flow.events.emit_sync(RuntimeEvents.LOAD_FILE, {"emit_loaded": True, "filename": "./flow.json"})

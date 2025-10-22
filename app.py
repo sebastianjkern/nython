@@ -3,6 +3,7 @@ from ui.editor import NodeEditor
 from ui.theming import get_theme, load_font
 
 from _runtime.events import RuntimeEvents
+from _runtime.node import NodeData, Connector, ConnectorType
 
 import dearpygui.dearpygui as dpg
 
@@ -24,33 +25,9 @@ node_editor = "editor_" + str(dpg.generate_uuid())
 create_node_popup = dpg.generate_uuid()
 create_node_input = dpg.generate_uuid()
 
-def print_me(sender):
-    print(f"Menu Item: {sender}")
-
 editor = NodeEditor(center_window)
-# flow.load_flow()
 with dpg.window(label="Nython Editor", tag=center_window, no_collapse=True, no_close=True, no_title_bar=True, no_move=True):
     editor.startup()
-
-    with dpg.menu_bar():
-        with dpg.menu(label="File"):
-            dpg.add_menu_item(label="Save", callback=print_me)
-            dpg.add_menu_item(label="Save As", callback=print_me)
-
-            with dpg.menu(label="Settings"):
-                dpg.add_menu_item(label="Setting 1", callback=print_me, check=True)
-                dpg.add_menu_item(label="Setting 2", callback=print_me)
-
-                with dpg.menu(label="Settings"):
-                    dpg.add_menu_item(label="Setting 1", callback=print_me, check=True)
-                    dpg.add_menu_item(label="Setting 2", callback=print_me)
-
-        dpg.add_menu_item(label="Help", callback=print_me)
-        
-        with dpg.menu(label="Widget Items"):
-            dpg.add_checkbox(label="Pick Me", callback=print_me)
-            dpg.add_button(label="Press Me", callback=print_me)
-            dpg.add_color_picker(label="Color Me", callback=print_me)
 
 # Create Node Pop Up
 with dpg.window(label="Create Node", modal=True, show=False, tag=create_node_popup, no_resize=True, no_collapse=True, no_move=True):
@@ -58,15 +35,31 @@ with dpg.window(label="Create Node", modal=True, show=False, tag=create_node_pop
 
     def _create_node_cb(sender, app_data):
         name = dpg.get_value(create_node_input)
-        # Emit a create_node command; the runtime will emit node_added which the GUI listens to
+
+        input_tag = "input_" + str(dpg.generate_uuid())
+        output_tag = "output_" + str(dpg.generate_uuid())
+
+        node_tag = "node_" + str(dpg.generate_uuid())
+        data = NodeData(node_tag, "")
+
+        in_conn = Connector(input_tag, data)
+        in_conn.type = ConnectorType.INPUT
+
+        out_conn = Connector(output_tag, data)
+        out_conn.type = ConnectorType.OUTPUT
+
+        data.inputs = [in_conn]
+        data.outputs = [out_conn]
+
+        # Request runtime to create the node via command event; GUI will be created from the runtime event
         try:
-            editor._flow.events.emit_sync(RuntimeEvents.CREATE_NODE, {"label": name})
+            # send serialized node so runtime can recreate it exactly
+            editor._flow.events.emit_sync(RuntimeEvents.CREATE_NODE, {"node": data.to_dict(), "label": name})
         except Exception:
-            # fallback to local create if event bus unavailable
-            try:
-                editor.create_node(name)
-            except Exception:
-                pass
+            pass
+
+        # Close the Popup in case the node was created sucessfully
+        dpg.configure_item(create_node_popup, show=False)
 
     # Close popup immediately; the GUI node will be created when the runtime emits the event
     dpg.configure_item(create_node_popup, show=False)
@@ -105,8 +98,6 @@ def key_handler(sender, app_data):
 
     # Delete selected nodes
     if app_data == dpg.mvKey_Delete:
-        print("Received node delete command")
-        
         nodes = dpg.get_selected_nodes(editor._editor_tag) or []
 
         # Dann die selektierten Nodes löschen
@@ -124,7 +115,7 @@ def key_handler(sender, app_data):
                         try:
                                 # Emit a remove command; runtime will remove and GUI updates from event
                                 try:
-                                    editor._flow.events.emit_sync(RuntimeEvents.REM_NODE, {"uuid": str(node)})
+                                    editor._flow.events.emit_sync(RuntimeEvents.REM_NODE, {"uuid": str(object=node)})
                                 except Exception:
                                     dpg.delete_item(node)
                         except Exception:
@@ -139,11 +130,10 @@ def key_handler(sender, app_data):
                 pass
 
     if app_data == dpg.mvKey_S and dpg.is_key_down(dpg.mvKey_LControl):
-        print("Saving")
         try:
             editor._flow.events.emit_sync(RuntimeEvents.SAVE, None)
         except Exception:
-            editor._flow.save()
+            print("Could not be saved")
 
 with dpg.handler_registry() as fff:
     dpg.add_key_press_handler(callback=key_handler)
