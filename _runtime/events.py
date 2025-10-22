@@ -1,8 +1,10 @@
 from typing import Callable, Dict, List, Any, Optional
 from queue import Queue, Empty
 from threading import Thread, Event
-
 from enum import Enum
+import logging
+
+logging.basicConfig(level=logging.INFO)
 
 class Events(Enum):
     pass
@@ -55,35 +57,32 @@ class EventBus:
 
     def subscribe(self, name: Events, callback: Callable[[Any], None]):
         """Subscribe to an event. Returns the callback for convenience."""
-        print(f"Registered listener for {name}")
-        
+        logging.debug("Registering listener for %s", name)
         self._listeners.setdefault(name, []).append(callback)
         return callback
 
-    def unsubscribe(self, name: str, callback: Callable[[Any], None]):
+    def unsubscribe(self, name: Events, callback: Callable[[Any], None]):
         """Unsubscribe a previously subscribed callback."""
-        print(f"Un-registered listener for {name}")
-        
+        logging.debug("Unregistering listener for %s", name)
         if name in self._listeners:
             try:
                 self._listeners[name].remove(callback)
             except ValueError:
-                pass
+                logging.debug("callback not found for %s", name)
 
     def emit(self, name: Events, payload: Any = None) -> None:
         """Enqueue an event for later delivery by either worker or main-thread poll()."""
-        print(f"Emitted {name}")
+        logging.debug("Emitting %s (queued)", name)
         self._queue.put((name, payload))
 
     def emit_sync(self, name: Events, payload: Any = None) -> None:
         """Immediately dispatch event to listeners on the caller thread."""
-        print(f"Emitted sync {name}")
+        logging.debug("Emitting sync %s", name)
         for cb in list(self._listeners.get(name, [])):
             try:
                 cb(payload)
             except Exception:
-                # keep behaviour simple here; prefer logging in real code
-                pass
+                logging.exception("listener raised in emit_sync for %s", name)
 
     def poll(self, max_items: int = 100) -> None:
         """Process up to max_items events from the queue synchronously (safe to call from main thread)."""
@@ -97,8 +96,7 @@ class EventBus:
                 try:
                     cb(payload)
                 except Exception:
-                    # prefer logging.exception in real code
-                    pass
+                    logging.exception("listener raised while polling %s", name)
             processed += 1
 
     def _run(self) -> None:

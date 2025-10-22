@@ -104,30 +104,26 @@ def key_handler(sender, app_data):
         # Dann die selektierten Nodes löschen
         for node in nodes:
             try:
-                # Prefer removing via runtime Flow so the GUI is reconciled from events
+                # Prefer removing via runtime Flow so GUI and runtime stay in sync.
                 lut = getattr(editor, "_node_lut", None)
                 if lut and str(node) in lut:
-                    node_obj = lut[str(node)]
-                    # NodeData is stored on the IMGuiNode instance as `_data`
+                    # ask runtime to remove; runtime will emit NODE_REMOVED -> GUI updates
                     try:
-                        editor._flow.remove_node(node_obj._data)
+                        editor._flow.events.emit_sync(RuntimeEvents.REM_NODE, {"uuid": str(node)})
                     except Exception:
-                        # fallback to deleting GUI item directly if runtime removal fails
+                        # fallback: delete GUI item directly if runtime path fails
                         try:
-                                # Emit a remove command; runtime will remove and GUI updates from event
-                                try:
-                                    editor._flow.events.emit_sync(RuntimeEvents.REM_NODE, {"uuid": str(object=node)})
-                                except Exception:
-                                    dpg.delete_item(node)
+                            dpg.delete_item(node)
                         except Exception:
                             pass
                 else:
-                    # If we don't have a runtime mapping, remove the GUI item directly
+                    # no runtime mapping available, delete GUI item
                     try:
                         dpg.delete_item(node)
                     except Exception:
                         pass
             except Exception:
+                # keep loop robust but log in future
                 pass
 
     if app_data == dpg.mvKey_S and dpg.is_key_down(dpg.mvKey_LControl):

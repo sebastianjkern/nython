@@ -162,11 +162,31 @@ class NodeEditor:
         if not uuid:
             return
         if self._node_lut and uuid in self._node_lut:
+            node_obj = self._node_lut[uuid]
+            # remove associated links from the LUT and delete link items
+            try:
+                # gather connector uuids from node data
+                conn_uuids = [c.uuid for c in getattr(node_obj, "_data").inputs] + [c.uuid for c in getattr(node_obj, "_data").outputs]
+                for key in list(self._link_lut.keys()):
+                    # key is a frozenset of two connector ids
+                    if any(cu in key for cu in conn_uuids):
+                        link_id = self._link_lut.pop(key, None)
+                        if link_id is not None:
+                            try:
+                                dpg.delete_item(link_id)
+                            except Exception:
+                                pass
+            except Exception:
+                pass
+            # finally delete the node UI and remove from lut
             try:
                 dpg.delete_item(uuid)
             except Exception:
                 pass
-            del self._node_lut[uuid]
+            try:
+                del self._node_lut[uuid]
+            except KeyError:
+                pass
 
 
     def startup(self):
