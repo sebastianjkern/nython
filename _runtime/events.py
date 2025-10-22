@@ -40,14 +40,18 @@ class EventBus:
     Call `stop()` to shut down the worker thread cleanly.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, threaded: bool = False) -> None:
         self._listeners: Dict[Events, List[Callable[[Any], None]]] = {}
         self._queue: Queue = Queue()
         self._stop_evt: Event = Event()
-        self._worker: Optional[Thread] = Thread(target=self._run, daemon=True)
-        self._worker.start()
+        self._worker: Optional[Thread] = None
 
-        print("Started EventBus...")
+        # only start worker when explicitly requested
+        if threaded:
+            self._worker = Thread(target=self._run, daemon=True)
+            self._worker.start()
+
+        print("EventBus initialized (threaded=%s)" % threaded)
 
     def subscribe(self, name: Events, callback: Callable[[Any], None]):
         """Subscribe to an event. Returns the callback for convenience."""
@@ -66,23 +70,39 @@ class EventBus:
             except ValueError:
                 pass
 
-    def emit(self, name: str, payload: Any = None) -> None:
-        """Asynchronously enqueue an event for delivery by the worker thread."""
+    def emit(self, name: Events, payload: Any = None) -> None:
+        """Enqueue an event for later delivery by either worker or main-thread poll()."""
         print(f"Emitted {name}")
-        
         self._queue.put((name, payload))
 
     def emit_sync(self, name: Events, payload: Any = None) -> None:
-        """Deliver event synchronously to listeners. Exceptions are swallowed."""
-        print(f"Emitted Synced {name}")
-        
+        """Immediately dispatch event to listeners on the caller thread."""
+        print(f"Emitted sync {name}")
         for cb in list(self._listeners.get(name, [])):
             try:
                 cb(payload)
             except Exception:
+                # keep behaviour simple here; prefer logging in real code
                 pass
 
+    def poll(self, max_items: int = 100) -> None:
+        """Process up to max_items events from the queue synchronously (safe to call from main thread)."""
+        processed = 0
+        while processed < max_items:
+            try:
+                name, payload = self._queue.get_nowait()
+            except Empty:
+                break
+            for cb in list(self._listeners.get(name, [])):
+                try:
+                    cb(payload)
+                except Exception:
+                    # prefer logging.exception in real code
+                    pass
+            processed += 1
+
     def _run(self) -> None:
+        # worker loop: block and dispatch; same dispatch logic but runs in worker thread
         while not self._stop_evt.is_set():
             try:
                 name, payload = self._queue.get(timeout=0.1)
@@ -92,12 +112,9 @@ class EventBus:
                 try:
                     cb(payload)
                 except Exception:
-                    # swallow listener exceptions; they must not kill the worker
                     pass
-            self._queue.task_done()
 
     def stop(self) -> None:
-        """Stop the background worker and wait for it to exit."""
         self._stop_evt.set()
         if self._worker and self._worker.is_alive():
-            self._worker.join(timeout=1.0)
+            self._worker.join(timeout=0.5)

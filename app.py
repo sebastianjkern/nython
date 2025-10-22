@@ -6,6 +6,7 @@ from _runtime.events import RuntimeEvents
 from _runtime.node import NodeData, Connector, ConnectorType
 
 import dearpygui.dearpygui as dpg
+import time
 
 # Redirect all print statements to a log file
 log_file = open("app.log", "a")
@@ -148,12 +149,22 @@ dpg.show_viewport()
 
 dpg.set_primary_window(center_window, True)
 
-dpg.start_dearpygui()
 try:
-    # stop EventBus worker(s) if any
+    # Main loop: render frames and poll runtime events in main thread
+    while dpg.is_dearpygui_running():
+        dpg.render_dearpygui_frame()
+        try:
+            editor._flow.events.poll()
+        except Exception:
+            # avoid stopping the loop on poll errors; log if needed
+            pass
+        # small sleep to be cooperative; adjust as needed
+        time.sleep(0.001)
+finally:
+    # ensure background worker (if any) is stopped and context torn down
     try:
         editor._flow.events.stop()
     except Exception:
         pass
-finally:
     dpg.destroy_context()
+    log_file.close()

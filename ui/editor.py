@@ -20,23 +20,22 @@ class NodeEditor:
         # track last known revision to avoid applying stale events
         self._revision = 0
 
-        # Subscribe to runtime events so GUI reconciles from runtime state
-        self._subscribe_runtime_events()
-
         # mapping of frozenset({a,b}) -> link_item_id created in DearPyGui
         # DPG may return int or str ids depending on build, accept both.
         self._link_lut = {}
 
     def _subscribe_runtime_events(self):
         try:
-            self._flow.events.subscribe(RuntimeEvents.NODE_CREATED, self._on_node_added)
-            self._flow.events.subscribe(RuntimeEvents.LOADED, self._on_loaded)
-            self._flow.events.subscribe(RuntimeEvents.CONN_ESTABLISHED, self._on_connection_added)
-            self._flow.events.subscribe(RuntimeEvents.CONN_REMOVED, self._on_connection_removed)
-            self._flow.events.subscribe(RuntimeEvents.NODE_REMOVED, self._on_node_removed)
-        except Exception:
-            # in tests or headless mode events may not be available
-            pass
+            ev = self._flow.events
+            # subscribe runtime -> gui handlers (these handlers will be invoked
+            # on the main thread when poll() is called)
+            ev.subscribe(RuntimeEvents.LOADED, self._on_loaded)
+            ev.subscribe(RuntimeEvents.NODE_CREATED, self._on_node_added)
+            ev.subscribe(RuntimeEvents.CONN_ESTABLISHED, self._on_connection_added)
+            ev.subscribe(RuntimeEvents.CONN_REMOVED, self._on_connection_removed)
+            ev.subscribe(RuntimeEvents.NODE_REMOVED, self._on_node_removed)
+        except Exception as e:
+            print("Failed to subscribe runtime events:", e)
 
     def link(self, sender, app_data):
         # Resolve aliases to connector UUIDs (the runtime uses UUID strings)
@@ -171,9 +170,26 @@ class NodeEditor:
 
 
     def startup(self):
-        self._subscribe_runtime_events()
+        # create the node editor widget and wire callbacks minimally
+        try:
+            # ensure node lookup is present
+            self._node_lut = {}
 
-        with dpg.node_editor(parent=self._imgui_parent, tag=self._editor_tag, callback=self.link, delink_callback=self.unlink):
-            # Emit the 'loaded' event now that the node_editor container exists so
-            # handlers can create nodes/links with a valid parent.
-            self._flow.events.emit_sync(RuntimeEvents.LOAD_FILE, {"emit_loaded": True, "filename": "./flow.json"})
+            # create a node editor area
+            with dpg.node_editor(parent=self._imgui_parent, tag=self._editor_tag, callback=self.link, delink_callback=self.unlink):
+                pass
+
+            # subscribe to runtime events (they will be processed via Flow.events.poll())
+            self._subscribe_runtime_events()
+
+            # request loading the default flow (Flow listens to LOAD_FILE)
+            try:
+                self._flow.events.emit(RuntimeEvents.LOAD_FILE, {"filename": "./flow.json", "emit_loaded": True})
+            except Exception:
+                # fallback: try synchronous emit if available
+                try:
+                    self._flow.events.emit_sync(RuntimeEvents.LOAD_FILE, {"filename": "./flow.json", "emit_loaded": True})
+                except Exception:
+                    pass
+        except Exception as e:
+            print("NodeEditor.startup failed:", e)
