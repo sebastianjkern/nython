@@ -7,6 +7,8 @@ def load_font():
     with dpg.font_registry():
         path = Path(__file__).parent / "/res/OpenSans-Regular.ttf"
 
+        print("Import font from", path)
+
         # first argument ids the path to the .ttf or .otf file
         default_font = dpg.add_font(path.absolute().as_uri(), 18)
         dpg.bind_font(default_font)
