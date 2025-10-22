@@ -1,0 +1,90 @@
+Metadata-Version: 2.4
+Name: nython
+Version: 0.1.0
+Summary: A node based editor and runtime environment for python
+Author: Sebastian Kern
+License-Expression: MIT
+Project-URL: Homepage, https://github.com/sebastianjkern/nython
+Project-URL: Issues, https://github.com/sebastianjkern/nython/issues
+Classifier: Programming Language :: Python :: 3
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.12
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Dynamic: license-file
+
+# Nython
+
+**Nython** is a lightweight, visual node‑based editor built with [DearPyGui](https://github.com/hoffstadt/DearPyGui).  
+It lets you create simple data flows by dragging nodes and connecting their inputs/outputs.  The project is intentionally small – it’s a learning playground for DearPyGui’s node editor primitives and Python integration.
+
+## Features
+
+| Feature | Description |
+|---------|-------------|
+| **Node creation** | Press `Shift+N` (or use the “Create Node” modal) to add a new node. Each node comes with an *Input* and *Output* attribute. |
+| **Linking / unlinking** | Drag from one node’s output to another node’s input to create a link; drag back or press `Delete` to remove it. |
+| **Keyboard shortcuts** | `Ctrl+S` – save (placeholder), `Shift+N` – open create‑node dialog, `Delete` – delete selected links/nodes. |
+| **Custom theming** | Themes are defined in `ui/theming.py`.  Feel free to tweak the colors and fonts. |
+| **Modular architecture** | The UI logic lives in `ui/`, while runtime flow handling is abstracted into `_runtime/`. |
+
+> *Note:* Persistence (save/load) is a TODO – you can extend the `Flow` class in `_runtime/flow.py`.
+
+## Project Structure
+
+```
+├── app.py                 # Entry point – launches DearPyGui viewport
+├── requirements.txt       # Dependencies (dearpygui)
+├── ui/
+│   ├── editor.py          # NodeEditor wrapper around DearPyGui node_editor
+│   ├── node.py            # Base IMGuiNode class
+│   ├── theming.py         # UI theme definitions
+│   └── shortcuts.py       # Keyboard bindings (currently minimal)
+├── _runtime/
+│   ├── flow.py            # Flow graph logic – load/save hooks
+│   └── node.py            # Node data model
+└── README.md              # This file
+```
+
+## Installation
+
+```bash
+# Clone the repo
+git clone https://github.com/yourusername/Nython.git
+cd Nython
+
+# Create a virtual environment (optional but recommended)
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\\Scripts\\activate
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+## Running the Application
+
+```bash
+python app.py
+```
+
+A window titled **“Nython Editor”** will appear. Use the menu bar or keyboard shortcuts to interact with nodes.
+
+### Quick Keyboard Cheat‑Sheet
+
+| Key | Action |
+|-----|--------|
+| `Shift+N` | Open “Create Node” modal |
+| `Delete` | Delete selected node/link |
+| `Ctrl+S` | (Future) Save current flow |
+
+## Extending the Project
+
+Feel free to open issues or pull requests!
+
+## License
+
+MIT © 2025 Sebastian Kern
+
+---
+
+Happy hacking! 🚀

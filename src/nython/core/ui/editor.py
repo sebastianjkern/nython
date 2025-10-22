@@ -4,7 +4,7 @@ from core.runtime.connector import Connector, ConnectorType
 
 from core.ui.node import IMGuiNode
 
-from _util.uuid import get_uuid
+from util.uuid import get_uuid
 
 import dearpygui.dearpygui as dpg
 
