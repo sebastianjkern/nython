@@ -119,7 +119,7 @@ class Flow:
         return executed
 
     @classmethod
-    def load(cls, filename = "./flow.json") -> "Flow":
+    def load(cls, filename = "./_examples/flow.json") -> "Flow":
         _flow = Flow()
 
         with open(filename, "r") as file:

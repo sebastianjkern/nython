@@ -4,7 +4,7 @@ def load_font(path):
     # add a font registry
     with dpg.font_registry():
         # first argument ids the path to the .ttf or .otf file
-        default_font = dpg.add_font(path.absolute().as_uri(), 18)
+        default_font = dpg.add_font(path, 18)
         dpg.bind_font(default_font)
 
 def get_theme(accent=(99, 179, 237, 255)):

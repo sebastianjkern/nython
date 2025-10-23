@@ -8,12 +8,12 @@ from nython.util.uuid import get_uuid
 import dearpygui.dearpygui as dpg
 
 class NodeEditor:
-    def __init__(self) -> None:
+    def __init__(self, path="flow.json") -> None:
         # Imgui Stuff
         self.editor_tag = "_editor"
 
         # Load Runtime Layer
-        self.flow: Flow = Flow.load()
+        self.flow: Flow = Flow.load(path)
 
         self.window_tag = "_window"
         self.settings_tag = "_settings"

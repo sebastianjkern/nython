@@ -1,7 +1,11 @@
 from nython.core.ui.editor import NodeEditor
 from nython.core.ui.theming import get_theme, load_font
 
+from inspect import getsourcefile
+from os.path import abspath
+
 from pathlib import Path
+import os
 
 import dearpygui.dearpygui as dpg
 
@@ -13,12 +17,15 @@ dpg.create_context()
 dpg.configure_app(docking=False, docking_space=False)
 dpg.create_viewport(title='Nython Editor', width=1280, height=720, decorated=True)
 
-path = Path(__file__).parent / "/res/OpenSans-Regular.ttf"
+# Import path for font file
+path = os.path.dirname(abspath(getsourcefile(lambda:0))) + "/res/OpenSans-Regular.ttf"
+example_path = os.path.dirname(abspath(getsourcefile(lambda:0))) + "/_examples/flow.json"
+
 print("Import font from", path)
 
 load_font(path)
 
-with NodeEditor() as editor:
+with NodeEditor(example_path) as editor:
     theme = get_theme()
     dpg.bind_theme(theme)
 
